@@ -34,5 +34,26 @@ pipeline {
                 }
             }
         }
+        stage('Deploy to production') {
+            when {
+                branch 'master'
+            }
+            steps {
+               input 'Deploy to Production?'
+               milestone(1)
+               withCredentials([uasernamePassword(credentialsId : 'webserver_login', usernameVariable: 'USERNAME', passworVariable: 'USERPASS')]) {
+                   script {
+                       sh "sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \" docker pull benancya/train_schedule:${env.BUILD_NUMBER}\""
+                       try{
+                            ssh " sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \" docker stop train_schedule\""
+                            ssh " sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \" docker rm train_schedule\""
+                       } catch (err){
+                            echo 'caught error: $err'
+                       }
+                       sh " sshpass -p '$USERPASS' -v ssh -o StrictHostKeyChecking=no $USERNAME@$prod_ip \" docker run --restart always --name train_schedule -p 8080:8080  -d benancya/train_schedule:${env.BUILD_NUMBER}\""
+                   }
+               }
+            }
+        }
     }
 }
